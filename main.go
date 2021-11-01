@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -39,16 +41,17 @@ func NewHttpServer(addr string) *HttpServer {
 }
 
 func (s *HttpServer) Start() error {
+	log.Println("start server:", s.Addr)
 	return s.server.ListenAndServe()
 }
 
 func (s *HttpServer) Stop() error {
+	log.Println("stop server:", s.Addr)
 	return s.server.Shutdown(context.TODO())
 }
 
 func main() {
-	pctx, cancel := context.WithCancel(context.TODO())
-	g, ctx := errgroup.WithContext(pctx)
+	g, ctx := errgroup.WithContext(context.Background())
 
 	servers := []*HttpServer{
 		NewHttpServer(":8091"),
@@ -58,7 +61,7 @@ func main() {
 		server := srv
 		g.Go(func() error {
 			<-ctx.Done()
-			fmt.Println(time.Now(), ": done")
+			log.Println("server: ", server.Addr, " done")
 			return server.Stop()
 		})
 		g.Go(func() error {
@@ -73,15 +76,15 @@ func main() {
 			select {
 			case <-ctx.Done():
 				err := ctx.Err()
-				fmt.Println(time.Now(), ":for done")
+				log.Println("group: done")
 				return err
 			case <-c:
-				fmt.Println(time.Now(), ":cancel")
-				cancel()
+				log.Println("recv: signal")
+				return errors.New("signal")
 			}
 		}
 	})
 	if err := g.Wait(); err != nil {
-		fmt.Println("exit...")
+		log.Println("exit...")
 	}
 }
